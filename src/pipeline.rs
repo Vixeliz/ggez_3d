@@ -111,7 +111,7 @@ impl Pipeline3d {
                 .wgpu()
                 .device
                 .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: None,
+                    label: Some("Render Pipeline"),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
                         module: &shader,
@@ -122,14 +122,14 @@ impl Pipeline3d {
                             attributes: &[
                                 // pos
                                 wgpu::VertexAttribute {
-                                    format: wgpu::VertexFormat::Float32x4,
+                                    format: wgpu::VertexFormat::Float32x3,
                                     offset: 0,
                                     shader_location: 0,
                                 },
                                 // tex_coord
                                 wgpu::VertexAttribute {
                                     format: wgpu::VertexFormat::Float32x2,
-                                    offset: 16,
+                                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
                                     shader_location: 1,
                                 },
                             ],
@@ -145,9 +145,9 @@ impl Pipeline3d {
                         conservative: false,
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
-                        format: wgpu::TextureFormat::Depth32Float,
+                        format: wgpu::TextureFormat::Depth24Plus,
                         depth_write_enabled: true,
-                        depth_compare: wgpu::CompareFunction::Greater,
+                        depth_compare: wgpu::CompareFunction::Less,
                         stencil: wgpu::StencilState::default(),
                         bias: wgpu::DepthBiasState::default(),
                     }),
@@ -161,14 +161,17 @@ impl Pipeline3d {
                         entry_point: "fs_main",
                         targets: &[Some(wgpu::ColorTargetState {
                             format: ctx.gfx.surface_format(),
-                            blend: None,
+                            blend: Some(wgpu::BlendState {
+                                color: wgpu::BlendComponent::REPLACE,
+                                alpha: wgpu::BlendComponent::REPLACE,
+                            }),
                             write_mask: wgpu::ColorWrites::ALL,
                         })],
                     }),
                     multiview: None,
                 });
 
-        let depth = graphics::ScreenImage::new(ctx, graphics::ImageFormat::Depth32Float, 1., 1., 1);
+        let depth = graphics::ScreenImage::new(ctx, graphics::ImageFormat::Depth24Plus, 1., 1., 1);
 
         Pipeline3d {
             meshes: Vec::default(),
@@ -202,8 +205,8 @@ impl Pipeline3d {
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: depth.wgpu().1,
                     depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(0.),
-                        store: false,
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: true,
                     }),
                     stencil_ops: None,
                 }),

@@ -5,14 +5,14 @@ use wgpu::util::DeviceExt;
 #[derive(Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
 pub struct Vertex {
-    pub pos: [f32; 4],
+    pub pos: [f32; 3],
     pub tex_coord: [f32; 2],
 }
 
 impl Vertex {
     pub fn new(p: [i8; 3], t: [i8; 2]) -> Vertex {
         Vertex {
-            pos: [f32::from(p[0]), f32::from(p[1]), f32::from(p[2]), 1.0],
+            pos: [f32::from(p[0]), f32::from(p[1]), f32::from(p[2])],
             tex_coord: [f32::from(t[0]), f32::from(t[1])],
         }
     }

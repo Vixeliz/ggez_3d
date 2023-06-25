@@ -138,6 +138,12 @@ impl event::EventHandler<ggez::GameError> for MainState {
         let forward = Vec3::new(yaw_cos, 0.0, yaw_sin).normalize();
         let right = Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
 
+        if k_ctx.is_key_pressed(KeyCode::Space) {
+            self.pipeline3d.camera_bundle.camera.position.y += 1.0;
+        }
+        if k_ctx.is_key_pressed(KeyCode::C) {
+            self.pipeline3d.camera_bundle.camera.position.y -= 1.0;
+        }
         if k_ctx.is_key_pressed(KeyCode::W) {
             self.pipeline3d.camera_bundle.camera.position += forward;
         }
