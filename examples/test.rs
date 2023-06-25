@@ -91,9 +91,14 @@ impl MainState {
             20, 21, 22, 22, 23, 20, // back
         ];
 
-        let image =
-            graphics::Image::from_solid(ctx, 1, graphics::Color::from_rgb(0x20, 0xA0, 0xC0));
-        let image_two = graphics::Image::from_solid(ctx, 1, graphics::Color::from_rgb(50, 10, 50));
+        let image = graphics::Image::from_color(
+            ctx,
+            1,
+            1,
+            Some(graphics::Color::from_rgb(0x20, 0xA0, 0xC0)),
+        );
+        let image_two =
+            graphics::Image::from_color(ctx, 1, 1, Some(graphics::Color::from_rgb(50, 10, 50)));
         let mut mesh = Mesh3d {
             vertices: vertex_data,
             indices: index_data.clone(),

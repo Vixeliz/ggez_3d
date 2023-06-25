@@ -6,10 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ggez = "0.8.1"
+ggez = "0.9.0"
+# ggez = {git = "https://github.com/ggez/ggez", branch = "devel"}
 mint = "0.5.9"
-wgpu = "0.14"
-glam = { version = "0.21.3", features = ["mint"] }
-crevice = "0.11"
+wgpu = "0.16"
+glam = { version = "0.24", features = ["mint"] }
+crevice = "0.13"
 bytemuck = { version = "1.12", features = ["derive"] }
 
