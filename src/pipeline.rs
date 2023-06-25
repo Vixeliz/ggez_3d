@@ -3,6 +3,7 @@ use ggez::graphics::Color;
 use ggez::{graphics, Context};
 use wgpu::util::DeviceExt;
 
+use crate::camera::CameraBundle;
 use crate::mesh::Vertex;
 use crate::{camera::CameraUniform, prelude::*};
 
@@ -10,19 +11,10 @@ pub struct Pipeline3d {
     pub meshes: Vec<Mesh3d>,
     pub pipeline: wgpu::RenderPipeline,
     pub depth: graphics::ScreenImage,
-    pub camera: Camera, // TODO: Support multiple cameras by rendering to a texture. Maybe just rerender and change the camera uniform?
+    pub camera_bundle: CameraBundle, // TODO: Support multiple cameras by rendering to a texture. Maybe just rerender and change the camera uniform?
     pub camera_uniform: CameraUniform,
     pub camera_buffer: wgpu::Buffer,
     pub camera_bind_group: wgpu::BindGroup,
-}
-
-fn default_view() -> Mat4 {
-    // Eye location, target location, up-vector
-    Mat4::look_at_rh(
-        Vec3::new(1.5f32, -5.0, 3.0),
-        Vec3::new(0f32, 0.0, 0.0),
-        Vec3::Z,
-    )
 }
 
 impl Pipeline3d {
@@ -34,10 +26,10 @@ impl Pipeline3d {
             .device
             .create_shader_module(wgpu::include_wgsl!("../resources/cube.wgsl"));
 
-        let mut camera = Camera::default();
-        camera.aspect = ctx.gfx.size().0 / ctx.gfx.size().1;
+        let mut camera_bundle = CameraBundle::default();
+        camera_bundle.projection.aspect = ctx.gfx.size().0 / ctx.gfx.size().1;
         let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera, default_view());
+        camera_uniform.update_view_proj(&camera_bundle);
 
         let camera_buffer =
             ctx.gfx
@@ -182,7 +174,7 @@ impl Pipeline3d {
             meshes: Vec::default(),
             depth,
             pipeline,
-            camera,
+            camera_bundle,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
@@ -219,7 +211,7 @@ impl Pipeline3d {
 
             for mesh in self.meshes.iter() {
                 pass.set_pipeline(&self.pipeline);
-                pass.set_bind_group(0, &mesh.bind_group.as_ref().unwrap(), &[]);
+                pass.set_bind_group(0, mesh.bind_group.as_ref().unwrap(), &[]);
                 // NEW!()
                 pass.set_bind_group(1, &self.camera_bind_group, &[]);
                 // let (vert_buffer, ind_buffer) = mesh.wgpu_buffer(ctx);
@@ -234,9 +226,19 @@ impl Pipeline3d {
     }
 
     pub fn resize(&mut self, width: f32, height: f32, ctx: &mut Context) {
-        self.camera.aspect = width / height;
-        self.camera_uniform
-            .update_view_proj(&self.camera, default_view());
+        self.camera_bundle
+            .projection
+            .resize(width as u32, height as u32);
+        self.camera_uniform.update_view_proj(&self.camera_bundle);
+        ctx.gfx.wgpu().queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[self.camera_uniform]),
+        );
+    }
+
+    pub fn update_camera(&mut self, ctx: &mut Context) {
+        self.camera_uniform.update_view_proj(&self.camera_bundle);
         ctx.gfx.wgpu().queue.write_buffer(
             &self.camera_buffer,
             0,

@@ -1,5 +1,6 @@
 use std::{env, path};
 
+use ggez::input::keyboard::KeyCode;
 use ggez::{
     event,
     glam::*,
@@ -115,6 +116,7 @@ impl MainState {
 
         mesh_two.gen_wgpu_buffer(&pipeline3d.pipeline, ctx);
         pipeline3d.meshes = vec![mesh, mesh_two];
+        pipeline3d.camera_bundle.camera.yaw = 90.0;
         Ok(MainState { pipeline3d })
     }
 }
@@ -125,7 +127,25 @@ impl event::EventHandler<ggez::GameError> for MainState {
         Ok(())
     }
 
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
+        let k_ctx = &ctx.keyboard;
+        let (yaw_sin, yaw_cos) = self.pipeline3d.camera_bundle.camera.yaw.sin_cos();
+        let forward = Vec3::new(yaw_cos, 0.0, yaw_sin).normalize();
+        let right = Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
+
+        if k_ctx.is_key_pressed(KeyCode::W) {
+            self.pipeline3d.camera_bundle.camera.position += forward;
+        }
+        if k_ctx.is_key_pressed(KeyCode::S) {
+            self.pipeline3d.camera_bundle.camera.position -= forward;
+        }
+        if k_ctx.is_key_pressed(KeyCode::D) {
+            self.pipeline3d.camera_bundle.camera.position += right;
+        }
+        if k_ctx.is_key_pressed(KeyCode::A) {
+            self.pipeline3d.camera_bundle.camera.position -= right;
+        }
+        self.pipeline3d.update_camera(ctx);
         Ok(())
     }
 
