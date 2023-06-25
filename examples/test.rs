@@ -1,6 +1,11 @@
 use std::{env, path};
 
-use ggez::{event, graphics, Context, GameResult};
+use ggez::{
+    event,
+    glam::*,
+    graphics::{self, Color},
+    Context, GameResult,
+};
 use ggez_3d::prelude::*;
 
 struct MainState {
@@ -98,7 +103,18 @@ impl MainState {
         };
 
         mesh.gen_wgpu_buffer(&pipeline3d.pipeline, ctx);
-        pipeline3d.meshes = vec![mesh];
+
+        let mut mesh_two = Mesh3d {
+            vertices: vertex_data_two,
+            indices: index_data,
+            vert_buffer: None,
+            ind_buffer: None,
+            bind_group: None,
+            texture: Some(image_two),
+        };
+
+        mesh_two.gen_wgpu_buffer(&pipeline3d.pipeline, ctx);
+        pipeline3d.meshes = vec![mesh, mesh_two];
         Ok(MainState { pipeline3d })
     }
 }
@@ -106,16 +122,6 @@ impl MainState {
 impl event::EventHandler<ggez::GameError> for MainState {
     fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) -> GameResult {
         self.pipeline3d.resize(width, height, ctx);
-        // println!("Resized screen to {}, {}", width, height);
-        // self.camera.aspect = width / height;
-        // self.camera_uniform.update_view_proj(&self.camera);
-        // ctx.gfx.wgpu().queue.write_buffer(
-        //     &self.camera_buffer,
-        //     0,
-        //     bytemuck::cast_slice(&[self.camera_uniform]),
-        // );
-        // let new_rect = graphics::Rect::new(0.0, 0.0, width as f32, height as f32);
-        // self.screen_coords = new_rect;
         Ok(())
     }
 
@@ -124,7 +130,23 @@ impl event::EventHandler<ggez::GameError> for MainState {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        self.pipeline3d.draw(ctx);
+        self.pipeline3d.draw(ctx, Color::from_rgb(25, 25, 25));
+        let mut canvas = graphics::Canvas::from_frame(ctx, None);
+
+        // Do ggez drawing
+        let dest_point1 = Vec2::new(10.0, 210.0);
+        let dest_point2 = Vec2::new(10.0, 250.0);
+        canvas.draw(
+            &graphics::Text::new("You can mix ggez and wgpu drawing;"),
+            dest_point1,
+        );
+        canvas.draw(
+            &graphics::Text::new("it basically draws wgpu stuff first, then ggez"),
+            dest_point2,
+        );
+
+        canvas.finish(ctx)?;
+
         Ok(())
     }
 }

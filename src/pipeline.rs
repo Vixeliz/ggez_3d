@@ -189,9 +189,8 @@ impl Pipeline3d {
         }
     }
 
-    pub fn draw(&mut self, ctx: &mut Context) {
+    pub fn draw(&mut self, ctx: &mut Context, clear_color: Color) {
         // TODO: Different colors
-        let mut canvas = graphics::Canvas::from_frame(ctx, Color::BLACK);
         // canvas.set_screen_coordinates(self.screen_coords);
         {
             let depth = self.depth.image(ctx);
@@ -204,10 +203,7 @@ impl Pipeline3d {
                     view: frame.wgpu().1,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(
-                            graphics::LinearColor::from(graphics::Color::new(0.1, 0.1, 0.1, 1.0))
-                                .into(),
-                        ),
+                        load: wgpu::LoadOp::Clear(graphics::LinearColor::from(clear_color).into()),
                         store: true,
                     },
                 })],
