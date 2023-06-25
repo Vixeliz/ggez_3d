@@ -145,6 +145,18 @@ impl event::EventHandler<ggez::GameError> for MainState {
         if k_ctx.is_key_pressed(KeyCode::A) {
             self.pipeline3d.camera_bundle.camera.position -= right;
         }
+        if k_ctx.is_key_pressed(KeyCode::Right) {
+            self.pipeline3d.camera_bundle.camera.yaw += 1.0_f32.to_radians();
+        }
+        if k_ctx.is_key_pressed(KeyCode::Left) {
+            self.pipeline3d.camera_bundle.camera.yaw -= 1.0_f32.to_radians();
+        }
+        if k_ctx.is_key_pressed(KeyCode::Up) {
+            self.pipeline3d.camera_bundle.camera.pitch += 1.0_f32.to_radians();
+        }
+        if k_ctx.is_key_pressed(KeyCode::Down) {
+            self.pipeline3d.camera_bundle.camera.pitch -= 1.0_f32.to_radians();
+        }
         self.pipeline3d.update_camera(ctx);
         Ok(())
     }
