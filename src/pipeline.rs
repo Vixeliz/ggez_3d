@@ -154,7 +154,7 @@ impl Pipeline3d {
                         conservative: false,
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
-                        format: wgpu::TextureFormat::Depth24Plus,
+                        format: wgpu::TextureFormat::Depth32Float,
                         depth_write_enabled: true,
                         depth_compare: wgpu::CompareFunction::Less,
                         stencil: wgpu::StencilState::default(),
@@ -180,7 +180,7 @@ impl Pipeline3d {
                     multiview: None,
                 });
 
-        let depth = graphics::ScreenImage::new(ctx, graphics::ImageFormat::Depth24Plus, 1., 1., 1);
+        let depth = graphics::ScreenImage::new(ctx, graphics::ImageFormat::Depth32Float, 1., 1., 1);
 
         Pipeline3d {
             depth,
