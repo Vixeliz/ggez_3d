@@ -1,8 +1,93 @@
+use crevice::std140::AsStd140;
 use ggez::graphics::Image;
 use ggez::{graphics, Context};
+use glam::{Mat4, Vec3, Vec4};
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
+use crate::canvas::DrawParam3d;
+
+#[derive(Debug, Copy, Clone)]
+pub struct Transform3d {
+    pub position: mint::Vector3<f32>,
+    pub rotation: mint::Quaternion<f32>,
+    pub scale: mint::Vector3<f32>,
+}
+
+impl Default for Transform3d {
+    fn default() -> Self {
+        Self {
+            position: Vec3::new(0.0, 0.0, 0.0).into(),
+            rotation: glam::Quat::IDENTITY.into(),
+            scale: Vec3::new(1.0, 1.0, 1.0).into(),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct Transform3dRaw {
+    transform: [[f32; 4]; 4],
+}
+
+impl Default for Transform3dRaw {
+    fn default() -> Self {
+        Self::from_param(&DrawParam3d::default())
+    }
+}
+
+impl Transform3dRaw {
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<Transform3dRaw>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 5,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                // A mat4 takes up 4 vertex slots as it is technically 4 vec4s. We need to define a slot
+                // for each vec4. We don't have to do this in code though.
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 6,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
+                    shader_location: 7,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 12]>() as wgpu::BufferAddress,
+                    shader_location: 8,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+            ],
+        }
+    }
+    pub fn from_param(param: &DrawParam3d) -> Self {
+        // TODO: Use colors as well
+        let transform = Mat4::from_scale_rotation_translation(
+            param.transform.scale.into(),
+            param.transform.rotation.into(),
+            param.transform.position.into(),
+        );
+
+        Self {
+            transform: [
+                transform.x_axis.into(),
+                transform.y_axis.into(),
+                transform.z_axis.into(),
+                transform.w_axis.into(),
+            ],
+        }
+    }
+}
+
+// TODO: Allow custom vertex formats
 #[derive(Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
 pub struct Vertex {

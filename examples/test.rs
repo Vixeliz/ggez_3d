@@ -8,11 +8,12 @@ use ggez::{
     graphics::{self, Color},
     Context, GameResult,
 };
+use ggez_3d::canvas::DrawParam3d;
 use ggez_3d::prelude::*;
 
 struct MainState {
     canvas3d: Canvas3d,
-    meshes: Vec<Mesh3d>,
+    meshes: Vec<(Mesh3d, Vec3, Vec3)>,
     default_shader: bool,
     custom_shader: Shader,
 }
@@ -127,7 +128,10 @@ impl MainState {
         canvas3d.camera_bundle.camera.yaw = 90.0;
         Ok(MainState {
             canvas3d,
-            meshes: vec![mesh, mesh_two],
+            meshes: vec![
+                (mesh, Vec3::new(10.0, 1.0, 1.0), Vec3::new(0.0, 0.0, 0.0)),
+                (mesh_two, Vec3::new(1.0, 1.0, 1.0), Vec3::new(0.0, 0.0, 0.0)),
+            ],
             default_shader: true,
             custom_shader: graphics::ShaderBuilder::from_path("/fancy.wgsl")
                 .build(&ctx.gfx)
@@ -192,7 +196,8 @@ impl event::EventHandler<ggez::GameError> for MainState {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         for mesh in self.meshes.iter() {
-            self.canvas3d.draw(mesh.clone());
+            self.canvas3d
+                .draw(mesh.0.clone(), DrawParam3d::default().scale(mesh.1));
         }
         self.canvas3d.finish(ctx, Color::BLACK);
         let mut canvas = graphics::Canvas::from_frame(ctx, None);

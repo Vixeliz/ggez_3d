@@ -4,19 +4,61 @@ use ggez::{graphics, Context};
 use wgpu::util::DeviceExt;
 
 use crate::camera::CameraBundle;
-use crate::mesh::Vertex;
+use crate::mesh::{Transform3d, Transform3dRaw, Vertex};
 use crate::{camera::CameraUniform, prelude::*};
 
 #[derive(Clone)]
+pub struct DrawParam3d {
+    pub transform: Transform3d,
+}
+
+impl DrawParam3d {
+    pub fn scale<V>(mut self, scale_: V) -> Self
+    where
+        V: Into<mint::Vector3<f32>>,
+    {
+        let p: mint::Vector3<f32> = scale_.into();
+        self.transform.scale = p;
+        self
+    }
+
+    pub fn position<P>(mut self, position_: P) -> Self
+    where
+        P: Into<mint::Vector3<f32>>,
+    {
+        let p: mint::Vector3<f32> = position_.into();
+        self.transform.position = p;
+        self
+    }
+
+    pub fn rotation<R>(mut self, rotation_: R) -> Self
+    where
+        R: Into<mint::Quaternion<f32>>,
+    {
+        let p: mint::Quaternion<f32> = rotation_.into();
+        self.transform.rotation = p;
+        self
+    }
+}
+
+impl Default for DrawParam3d {
+    fn default() -> Self {
+        Self {
+            transform: Transform3d::default(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct DrawState3d {
-    pub position: Vec3,
     pub shader: Shader,
 }
 
 #[derive(Clone)]
 pub struct DrawCommand3d {
-    pub mesh: Mesh3d,
+    pub mesh: Mesh3d, // Maybe take a reference instead
     pub state: DrawState3d,
+    pub param: DrawParam3d,
 }
 
 pub struct Canvas3d {
@@ -28,6 +70,7 @@ pub struct Canvas3d {
     pub depth: graphics::ScreenImage,
     pub camera_bundle: CameraBundle, // TODO: Support multiple cameras by rendering to a texture. Maybe just rerender and change the camera uniform?
     pub camera_uniform: CameraUniform,
+    pub instance_buffer: wgpu::Buffer,
     pub camera_buffer: wgpu::Buffer,
     pub camera_bind_group: wgpu::BindGroup,
 }
@@ -42,6 +85,7 @@ impl Canvas3d {
         camera_bundle.projection.aspect = ctx.gfx.size().0 / ctx.gfx.size().1;
         let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&camera_bundle);
+        // let draw_uniform = Draw3dUniforms::default();
 
         let camera_buffer =
             ctx.gfx
@@ -51,6 +95,19 @@ impl Canvas3d {
                     label: Some("Camera Buffer"),
                     contents: bytemuck::cast_slice(&[camera_uniform]),
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                });
+
+        let instance_buffer =
+            ctx.gfx
+                .wgpu()
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Instance Buffer"),
+                    contents: bytemuck::cast_slice(&[
+                        Transform3dRaw::default(),
+                        Transform3dRaw::default(),
+                    ]),
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 });
 
         let camera_bind_group_layout =
@@ -95,6 +152,7 @@ impl Canvas3d {
                     ],
                     label: Some("texture_bind_group_layout"),
                 });
+
         let camera_bind_group =
             ctx.gfx
                 .wgpu()
@@ -129,11 +187,9 @@ impl Canvas3d {
             camera_bind_group,
             state: DrawState3d {
                 shader: shader.clone(),
-                position: Vec3::ZERO,
             },
             original_state: DrawState3d {
                 shader: shader.clone(),
-                position: Vec3::ZERO,
             },
             draws: Vec::default(),
             pipeline: ctx.gfx.wgpu().device.create_render_pipeline(
@@ -143,24 +199,28 @@ impl Canvas3d {
                     vertex: wgpu::VertexState {
                         module: &shader.vs_module.unwrap(),
                         entry_point: "vs_main",
-                        buffers: &[wgpu::VertexBufferLayout {
-                            array_stride: std::mem::size_of::<Vertex>() as _,
-                            step_mode: wgpu::VertexStepMode::Vertex,
-                            attributes: &[
-                                // pos
-                                wgpu::VertexAttribute {
-                                    format: wgpu::VertexFormat::Float32x3,
-                                    offset: 0,
-                                    shader_location: 0,
-                                },
-                                // tex_coord
-                                wgpu::VertexAttribute {
-                                    format: wgpu::VertexFormat::Float32x2,
-                                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                                    shader_location: 1,
-                                },
-                            ],
-                        }],
+                        buffers: &[
+                            wgpu::VertexBufferLayout {
+                                array_stride: std::mem::size_of::<Vertex>() as _,
+                                step_mode: wgpu::VertexStepMode::Vertex,
+                                attributes: &[
+                                    // pos
+                                    wgpu::VertexAttribute {
+                                        format: wgpu::VertexFormat::Float32x3,
+                                        offset: 0,
+                                        shader_location: 0,
+                                    },
+                                    // tex_coord
+                                    wgpu::VertexAttribute {
+                                        format: wgpu::VertexFormat::Float32x2,
+                                        offset: std::mem::size_of::<[f32; 3]>()
+                                            as wgpu::BufferAddress,
+                                        shader_location: 1,
+                                    },
+                                ],
+                            },
+                            Transform3dRaw::desc(),
+                        ],
                     },
                     primitive: wgpu::PrimitiveState {
                         topology: wgpu::PrimitiveTopology::TriangleList,
@@ -198,6 +258,7 @@ impl Canvas3d {
                     multiview: None,
                 },
             ),
+            instance_buffer,
         };
 
         pipeline3d
@@ -207,7 +268,6 @@ impl Canvas3d {
         let shader = graphics::ShaderBuilder::from_path("/cube.wgsl")
             .build(&ctx.gfx)
             .unwrap();
-        // let params = graphics::ShaderParamsBuilder::new(&false).build(ctx);
         self.state.shader = shader;
         self.dirty_pipeline = true;
     }
@@ -285,24 +345,28 @@ impl Canvas3d {
                             .as_ref()
                             .unwrap_or(self.original_state.shader.vs_module.as_ref().unwrap()),
                         entry_point: "vs_main",
-                        buffers: &[wgpu::VertexBufferLayout {
-                            array_stride: std::mem::size_of::<Vertex>() as _,
-                            step_mode: wgpu::VertexStepMode::Vertex,
-                            attributes: &[
-                                // pos
-                                wgpu::VertexAttribute {
-                                    format: wgpu::VertexFormat::Float32x3,
-                                    offset: 0,
-                                    shader_location: 0,
-                                },
-                                // tex_coord
-                                wgpu::VertexAttribute {
-                                    format: wgpu::VertexFormat::Float32x2,
-                                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                                    shader_location: 1,
-                                },
-                            ],
-                        }],
+                        buffers: &[
+                            wgpu::VertexBufferLayout {
+                                array_stride: std::mem::size_of::<Vertex>() as _,
+                                step_mode: wgpu::VertexStepMode::Vertex,
+                                attributes: &[
+                                    // pos
+                                    wgpu::VertexAttribute {
+                                        format: wgpu::VertexFormat::Float32x3,
+                                        offset: 0,
+                                        shader_location: 0,
+                                    },
+                                    // tex_coord
+                                    wgpu::VertexAttribute {
+                                        format: wgpu::VertexFormat::Float32x2,
+                                        offset: std::mem::size_of::<[f32; 3]>()
+                                            as wgpu::BufferAddress,
+                                        shader_location: 1,
+                                    },
+                                ],
+                            },
+                            Transform3dRaw::desc(),
+                        ],
                     },
                     primitive: wgpu::PrimitiveState {
                         topology: wgpu::PrimitiveTopology::TriangleList,
@@ -354,6 +418,7 @@ impl Canvas3d {
         {
             let depth = self.depth.image(ctx).clone();
             let frame = ctx.gfx.frame().clone();
+            self.update_instance_data(ctx);
             let mut pass =
                 ctx.gfx
                     .commands()
@@ -379,11 +444,14 @@ impl Canvas3d {
                             stencil_ops: None,
                         }),
                     });
-            for draw in self.draws.iter() {
+            for (i, draw) in self.draws.iter().enumerate() {
+                let i = i as u32;
                 if draw.state.shader != self.state.shader {
                     // self.set_shader(draw.state.shader.clone());
                 }
+
                 pass.set_pipeline(&self.pipeline);
+                pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
                 pass.set_bind_group(0, draw.mesh.bind_group.as_ref().unwrap(), &[]);
                 pass.set_bind_group(1, &self.camera_bind_group, &[]);
                 pass.set_vertex_buffer(0, draw.mesh.vert_buffer.as_ref().unwrap().slice(..));
@@ -391,16 +459,30 @@ impl Canvas3d {
                     draw.mesh.ind_buffer.as_ref().unwrap().slice(..),
                     wgpu::IndexFormat::Uint32,
                 );
-                pass.draw_indexed(0..draw.mesh.indices.len() as u32, 0, 0..1);
+                pass.draw_indexed(0..draw.mesh.indices.len() as u32, 0, i..i + 1);
             }
         }
         self.draws.clear();
     }
 
-    pub fn draw(&mut self, mesh: Mesh3d) {
+    pub fn update_instance_data(&mut self, ctx: &mut Context) {
+        let instance_data = self
+            .draws
+            .iter()
+            .map(|x| Transform3dRaw::from_param(&x.param))
+            .collect::<Vec<_>>();
+        ctx.gfx.wgpu().queue.write_buffer(
+            &self.instance_buffer,
+            0,
+            bytemuck::cast_slice(&instance_data),
+        );
+    }
+
+    pub fn draw(&mut self, mesh: Mesh3d, param: DrawParam3d) {
         self.draws.push(DrawCommand3d {
             mesh,
             state: self.state.clone(),
+            param,
         });
     }
 
