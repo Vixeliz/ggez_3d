@@ -1,5 +1,6 @@
 use std::{env, path};
 
+use ggez::graphics::Shader;
 use ggez::input::keyboard::KeyCode;
 use ggez::{
     event,
@@ -10,13 +11,15 @@ use ggez::{
 use ggez_3d::prelude::*;
 
 struct MainState {
-    pipeline3d: Pipeline3d,
+    canvas3d: Canvas3d,
     meshes: Vec<Mesh3d>,
+    default_shader: bool,
+    custom_shader: Shader,
 }
 
 impl MainState {
     fn new(ctx: &mut Context) -> GameResult<Self> {
-        let mut pipeline3d = Pipeline3d::new(ctx);
+        let mut canvas3d = Canvas3d::new(ctx);
         let vertex_data = vec![
             // top (0, 0, 1)
             Vertex::new([-1, -1, 1], [0, 0]),
@@ -109,7 +112,7 @@ impl MainState {
             texture: Some(image),
         };
 
-        mesh.gen_wgpu_buffer(&pipeline3d.pipeline, ctx);
+        mesh.gen_wgpu_buffer(&canvas3d.pipeline, ctx);
 
         let mut mesh_two = Mesh3d {
             vertices: vertex_data_two,
@@ -120,71 +123,78 @@ impl MainState {
             texture: Some(image_two),
         };
 
-        mesh_two.gen_wgpu_buffer(&pipeline3d.pipeline, ctx);
-        pipeline3d.camera_bundle.camera.yaw = 90.0;
+        mesh_two.gen_wgpu_buffer(&canvas3d.pipeline, ctx);
+        canvas3d.camera_bundle.camera.yaw = 90.0;
         Ok(MainState {
-            pipeline3d,
+            canvas3d,
             meshes: vec![mesh, mesh_two],
+            default_shader: true,
+            custom_shader: graphics::ShaderBuilder::from_path("/fancy.wgsl")
+                .build(&ctx.gfx)
+                .unwrap(),
         })
     }
 }
 
 impl event::EventHandler<ggez::GameError> for MainState {
     fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) -> GameResult {
-        self.pipeline3d.resize(width, height, ctx);
+        self.canvas3d.resize(width, height, ctx);
         Ok(())
     }
 
     fn update(&mut self, ctx: &mut Context) -> GameResult {
-        let k_ctx = &ctx.keyboard;
-        let (yaw_sin, yaw_cos) = self.pipeline3d.camera_bundle.camera.yaw.sin_cos();
+        let k_ctx = &ctx.keyboard.clone();
+        let (yaw_sin, yaw_cos) = self.canvas3d.camera_bundle.camera.yaw.sin_cos();
         let forward = Vec3::new(yaw_cos, 0.0, yaw_sin).normalize();
         let right = Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
 
+        if k_ctx.is_key_just_pressed(KeyCode::K) {
+            if self.default_shader {
+                self.canvas3d.set_shader(self.custom_shader.clone());
+            } else {
+                self.canvas3d.set_default_shader(ctx);
+            }
+            self.default_shader = !self.default_shader;
+        }
         if k_ctx.is_key_pressed(KeyCode::Space) {
-            self.pipeline3d.camera_bundle.camera.position.y += 1.0;
+            self.canvas3d.camera_bundle.camera.position.y += 1.0;
         }
         if k_ctx.is_key_pressed(KeyCode::C) {
-            self.pipeline3d.camera_bundle.camera.position.y -= 1.0;
+            self.canvas3d.camera_bundle.camera.position.y -= 1.0;
         }
         if k_ctx.is_key_pressed(KeyCode::W) {
-            self.pipeline3d.camera_bundle.camera.position += forward;
+            self.canvas3d.camera_bundle.camera.position += forward;
         }
         if k_ctx.is_key_pressed(KeyCode::S) {
-            self.pipeline3d.camera_bundle.camera.position -= forward;
+            self.canvas3d.camera_bundle.camera.position -= forward;
         }
         if k_ctx.is_key_pressed(KeyCode::D) {
-            self.pipeline3d.camera_bundle.camera.position += right;
+            self.canvas3d.camera_bundle.camera.position += right;
         }
         if k_ctx.is_key_pressed(KeyCode::A) {
-            self.pipeline3d.camera_bundle.camera.position -= right;
+            self.canvas3d.camera_bundle.camera.position -= right;
         }
         if k_ctx.is_key_pressed(KeyCode::Right) {
-            self.pipeline3d.camera_bundle.camera.yaw += 1.0_f32.to_radians();
+            self.canvas3d.camera_bundle.camera.yaw += 1.0_f32.to_radians();
         }
         if k_ctx.is_key_pressed(KeyCode::Left) {
-            self.pipeline3d.camera_bundle.camera.yaw -= 1.0_f32.to_radians();
+            self.canvas3d.camera_bundle.camera.yaw -= 1.0_f32.to_radians();
         }
         if k_ctx.is_key_pressed(KeyCode::Up) {
-            self.pipeline3d.camera_bundle.camera.pitch += 1.0_f32.to_radians();
+            self.canvas3d.camera_bundle.camera.pitch += 1.0_f32.to_radians();
         }
         if k_ctx.is_key_pressed(KeyCode::Down) {
-            self.pipeline3d.camera_bundle.camera.pitch -= 1.0_f32.to_radians();
+            self.canvas3d.camera_bundle.camera.pitch -= 1.0_f32.to_radians();
         }
-        self.pipeline3d.update_camera(ctx);
+        self.canvas3d.update_camera(ctx);
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         for mesh in self.meshes.iter() {
-            self.pipeline3d.draw(
-                mesh.clone(),
-                DrawState3d {
-                    position: Vec3::ZERO,
-                },
-            );
+            self.canvas3d.draw(mesh.clone());
         }
-        self.pipeline3d.finish(ctx, Color::BLACK);
+        self.canvas3d.finish(ctx, Color::BLACK);
         let mut canvas = graphics::Canvas::from_frame(ctx, None);
 
         // Do ggez drawing
