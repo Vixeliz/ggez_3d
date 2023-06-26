@@ -23,6 +23,7 @@ pub struct Canvas3d {
     pub draws: Vec<DrawCommand3d>,
     pub dirty_pipeline: bool,
     pub state: DrawState3d,
+    pub original_state: DrawState3d,
     pub pipeline: wgpu::RenderPipeline,
     pub depth: graphics::ScreenImage,
     pub camera_bundle: CameraBundle, // TODO: Support multiple cameras by rendering to a texture. Maybe just rerender and change the camera uniform?
@@ -127,6 +128,10 @@ impl Canvas3d {
             camera_buffer,
             camera_bind_group,
             state: DrawState3d {
+                shader: shader.clone(),
+                position: Vec3::ZERO,
+            },
+            original_state: DrawState3d {
                 shader: shader.clone(),
                 position: Vec3::ZERO,
             },
@@ -273,7 +278,12 @@ impl Canvas3d {
                     label: Some("Render Pipeline"),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
-                        module: &self.state.shader.vs_module.as_ref().unwrap(),
+                        module: &self
+                            .state
+                            .shader
+                            .vs_module
+                            .as_ref()
+                            .unwrap_or(self.original_state.shader.vs_module.as_ref().unwrap()),
                         entry_point: "vs_main",
                         buffers: &[wgpu::VertexBufferLayout {
                             array_stride: std::mem::size_of::<Vertex>() as _,
@@ -316,7 +326,12 @@ impl Canvas3d {
                         alpha_to_coverage_enabled: false,
                     },
                     fragment: Some(wgpu::FragmentState {
-                        module: &self.state.shader.fs_module.as_ref().unwrap(),
+                        module: &self
+                            .state
+                            .shader
+                            .fs_module
+                            .as_ref()
+                            .unwrap_or(self.original_state.shader.fs_module.as_ref().unwrap()),
                         entry_point: "fs_main",
                         targets: &[Some(wgpu::ColorTargetState {
                             format: ctx.gfx.surface_format(),
