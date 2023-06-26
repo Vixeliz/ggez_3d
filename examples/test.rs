@@ -7,10 +7,12 @@ use ggez::{
     graphics::{self, Color},
     Context, GameResult,
 };
+use ggez_3d::pipeline::DrawState3d;
 use ggez_3d::prelude::*;
 
 struct MainState {
     pipeline3d: Pipeline3d,
+    meshes: Vec<Mesh3d>,
 }
 
 impl MainState {
@@ -120,9 +122,11 @@ impl MainState {
         };
 
         mesh_two.gen_wgpu_buffer(&pipeline3d.pipeline, ctx);
-        pipeline3d.meshes = vec![mesh, mesh_two];
         pipeline3d.camera_bundle.camera.yaw = 90.0;
-        Ok(MainState { pipeline3d })
+        Ok(MainState {
+            pipeline3d,
+            meshes: vec![mesh, mesh_two],
+        })
     }
 }
 
@@ -173,7 +177,15 @@ impl event::EventHandler<ggez::GameError> for MainState {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        self.pipeline3d.draw(ctx, Color::from_rgb(25, 25, 25));
+        for mesh in self.meshes.iter() {
+            self.pipeline3d.draw(
+                mesh.clone(),
+                DrawState3d {
+                    position: Vec3::ZERO,
+                },
+            );
+        }
+        self.pipeline3d.finish(ctx, Color::BLACK);
         let mut canvas = graphics::Canvas::from_frame(ctx, None);
 
         // Do ggez drawing

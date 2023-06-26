@@ -7,8 +7,17 @@ use crate::camera::CameraBundle;
 use crate::mesh::Vertex;
 use crate::{camera::CameraUniform, prelude::*};
 
+pub struct DrawState3d {
+    pub position: Vec3,
+}
+
+pub struct DrawCommand3d {
+    pub mesh: Mesh3d,
+    pub state: DrawState3d,
+}
+
 pub struct Pipeline3d {
-    pub meshes: Vec<Mesh3d>,
+    pub draws: Vec<DrawCommand3d>,
     pub pipeline: wgpu::RenderPipeline,
     pub depth: graphics::ScreenImage,
     pub camera_bundle: CameraBundle, // TODO: Support multiple cameras by rendering to a texture. Maybe just rerender and change the camera uniform?
@@ -174,58 +183,65 @@ impl Pipeline3d {
         let depth = graphics::ScreenImage::new(ctx, graphics::ImageFormat::Depth24Plus, 1., 1., 1);
 
         Pipeline3d {
-            meshes: Vec::default(),
             depth,
             pipeline,
             camera_bundle,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            draws: Vec::default(),
         }
     }
 
-    pub fn draw(&mut self, ctx: &mut Context, clear_color: Color) {
-        // TODO: Different colors
-        // canvas.set_screen_coordinates(self.screen_coords);
+    pub fn finish(&mut self, ctx: &mut Context, clear_color: Color) {
         {
-            let depth = self.depth.image(ctx);
-
+            let depth = self.depth.image(ctx).clone();
             let frame = ctx.gfx.frame().clone();
-            let cmd = ctx.gfx.commands().unwrap();
-            let mut pass = cmd.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: frame.wgpu().1,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(graphics::LinearColor::from(clear_color).into()),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: depth.wgpu().1,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: true,
-                    }),
-                    stencil_ops: None,
-                }),
-            });
-
-            for mesh in self.meshes.iter() {
+            let mut pass =
+                ctx.gfx
+                    .commands()
+                    .unwrap()
+                    .begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: frame.wgpu().1,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(
+                                    graphics::LinearColor::from(clear_color).into(),
+                                ),
+                                store: true,
+                            },
+                        })],
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: depth.wgpu().1,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(1.0),
+                                store: true,
+                            }),
+                            stencil_ops: None,
+                        }),
+                    });
+            for draw in self.draws.iter() {
                 pass.set_pipeline(&self.pipeline);
-                pass.set_bind_group(0, mesh.bind_group.as_ref().unwrap(), &[]);
-                // NEW!()
+                pass.set_bind_group(0, draw.mesh.bind_group.as_ref().unwrap(), &[]);
                 pass.set_bind_group(1, &self.camera_bind_group, &[]);
-                // let (vert_buffer, ind_buffer) = mesh.wgpu_buffer(ctx);
-                pass.set_vertex_buffer(0, mesh.vert_buffer.as_ref().unwrap().slice(..));
+                pass.set_vertex_buffer(0, draw.mesh.vert_buffer.as_ref().unwrap().slice(..));
                 pass.set_index_buffer(
-                    mesh.ind_buffer.as_ref().unwrap().slice(..),
+                    draw.mesh.ind_buffer.as_ref().unwrap().slice(..),
                     wgpu::IndexFormat::Uint32,
                 );
-                pass.draw_indexed(0..mesh.indices.len() as u32, 0, 0..1);
+                pass.draw_indexed(0..draw.mesh.indices.len() as u32, 0, 0..1);
             }
         }
+        self.draws.clear();
+    }
+
+    pub fn draw(&mut self, mesh: Mesh3d, draw_state: DrawState3d) {
+        self.draws.push(DrawCommand3d {
+            mesh,
+            state: draw_state,
+        });
     }
 
     pub fn resize(&mut self, width: f32, height: f32, ctx: &mut Context) {

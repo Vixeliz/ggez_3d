@@ -1,5 +1,6 @@
 use ggez::graphics::Image;
 use ggez::{graphics, Context};
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 #[derive(Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
@@ -18,12 +19,13 @@ impl Vertex {
     }
 }
 
+#[derive(Clone)]
 pub struct Mesh3d {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
-    pub vert_buffer: Option<wgpu::Buffer>,
-    pub ind_buffer: Option<wgpu::Buffer>,
-    pub bind_group: Option<wgpu::BindGroup>,
+    pub vert_buffer: Option<Arc<wgpu::Buffer>>,
+    pub ind_buffer: Option<Arc<wgpu::Buffer>>,
+    pub bind_group: Option<Arc<wgpu::BindGroup>>,
     pub texture: Option<Image>,
 }
 
@@ -76,8 +78,8 @@ impl Mesh3d {
                 ],
             });
 
-        self.bind_group = Some(bind_group);
-        self.vert_buffer = Some(verts);
-        self.ind_buffer = Some(inds);
+        self.bind_group = Some(Arc::new(bind_group));
+        self.vert_buffer = Some(Arc::new(verts));
+        self.ind_buffer = Some(Arc::new(inds));
     }
 }
