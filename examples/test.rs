@@ -7,7 +7,6 @@ use ggez::{
     graphics::{self, Color},
     Context, GameResult,
 };
-use ggez_3d::pipeline::DrawState3d;
 use ggez_3d::prelude::*;
 
 struct MainState {

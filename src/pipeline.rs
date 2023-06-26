@@ -195,7 +195,7 @@ impl Pipeline3d {
 
     pub fn finish(&mut self, ctx: &mut Context, clear_color: Color) {
         {
-            let depth = self.depth.image(ctx).clone();
+            let depth = self.depth.image(ctx);
             let frame = ctx.gfx.frame().clone();
             let mut pass =
                 ctx.gfx
