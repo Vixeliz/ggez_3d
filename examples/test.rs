@@ -184,7 +184,7 @@ impl event::EventHandler<ggez::GameError> for MainState {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        let mut canvas3d = Canvas3d::new(ctx, &mut self.camera);
+        let mut canvas3d = Canvas3d::from_frame(ctx, &mut self.camera);
         if self.default_shader {
             canvas3d.set_default_shader(ctx);
         } else {

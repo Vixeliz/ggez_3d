@@ -89,7 +89,19 @@ pub struct Canvas3d {
 }
 
 impl Canvas3d {
-    pub fn new(ctx: &mut Context, camera: &mut CameraBundle) -> Self {
+    pub fn from_frame(ctx: &mut Context, camera: &mut CameraBundle) -> Self {
+        Self::new(ctx, camera, ctx.gfx.frame().clone())
+    }
+
+    pub fn from_image(
+        ctx: &mut Context,
+        camera: &mut CameraBundle,
+        image: graphics::Image,
+    ) -> Self {
+        Self::new(ctx, camera, image)
+    }
+
+    pub fn new(ctx: &mut Context, camera: &mut CameraBundle, target: graphics::Image) -> Self {
         let cube_code = include_str!("../resources/cube.wgsl");
         let shader = graphics::ShaderBuilder::from_code(cube_code)
             .build(&ctx.gfx)
@@ -246,7 +258,7 @@ impl Canvas3d {
                 },
             ),
             instance_buffer,
-            target: ctx.gfx.frame().clone(),
+            target,
         };
 
         pipeline3d
