@@ -4,6 +4,7 @@ use glam::{Mat4, Vec3};
 use mint::{Vector2, Vector3};
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
+use wgpu::RenderPipeline;
 
 use crate::canvas::DrawParam3d;
 
@@ -25,8 +26,8 @@ impl Default for Aabb {
 impl Aabb {
     #[inline]
     pub fn from_min_max(minimum: Vec3, maximum: Vec3) -> Self {
-        let minimum = Vec3::from(minimum);
-        let maximum = Vec3::from(maximum);
+        let minimum = minimum;
+        let maximum = maximum;
         let center = 0.5 * (maximum + minimum);
         let half_extents = 0.5 * (maximum - minimum);
         Self {
@@ -196,7 +197,7 @@ pub struct Mesh3d {
 }
 
 impl Mesh3d {
-    pub fn gen_wgpu_buffer(&mut self, pipeline: &wgpu::RenderPipeline, ctx: &mut Context) {
+    pub fn gen_wgpu_buffer(&mut self, ctx: &mut Context) {
         let verts = ctx
             .gfx
             .wgpu()
@@ -216,6 +217,11 @@ impl Mesh3d {
                 usage: wgpu::BufferUsages::INDEX,
             });
 
+        self.vert_buffer = Some(Arc::new(verts));
+        self.ind_buffer = Some(Arc::new(inds));
+    }
+
+    pub fn gen_bind_group(&mut self, pipeline: &RenderPipeline, ctx: &mut Context) {
         // Allow custom one set through mesh
         let sampler = ctx
             .gfx
@@ -254,8 +260,6 @@ impl Mesh3d {
             });
 
         self.bind_group = Some(Arc::new(bind_group));
-        self.vert_buffer = Some(Arc::new(verts));
-        self.ind_buffer = Some(Arc::new(inds));
     }
 
     pub fn to_aabb(&self) -> Option<Aabb> {
@@ -272,7 +276,7 @@ impl Mesh3d {
             && maximum.y != std::f32::MIN
             && maximum.z != std::f32::MIN
         {
-            return Some(Aabb::from_min_max(minimum, maximum));
+            Some(Aabb::from_min_max(minimum, maximum))
         } else {
             None
         }

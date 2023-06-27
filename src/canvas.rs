@@ -81,24 +81,23 @@ pub struct Canvas3d {
     pub original_state: DrawState3d,
     pub pipeline: wgpu::RenderPipeline,
     pub depth: graphics::ScreenImage,
-    pub camera_bundle: CameraBundle, // TODO: Support multiple cameras by rendering to a texture. Maybe just rerender and change the camera uniform?
     pub camera_uniform: CameraUniform,
     pub instance_buffer: wgpu::Buffer,
     pub camera_buffer: wgpu::Buffer,
     pub camera_bind_group: wgpu::BindGroup,
+    pub target: graphics::Image,
 }
 
 impl Canvas3d {
-    pub fn new(ctx: &mut Context) -> Self {
+    pub fn new(ctx: &mut Context, camera: &mut CameraBundle) -> Self {
         let cube_code = include_str!("../resources/cube.wgsl");
         let shader = graphics::ShaderBuilder::from_code(cube_code)
             .build(&ctx.gfx)
             .unwrap(); // Should never fail since cube.wgsl is unchanging
 
-        let mut camera_bundle = CameraBundle::default();
-        camera_bundle.projection.aspect = ctx.gfx.size().0 / ctx.gfx.size().1;
+        camera.projection.aspect = ctx.gfx.size().0 / ctx.gfx.size().1;
         let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera_bundle);
+        camera_uniform.update_view_proj(camera);
 
         let camera_buffer =
             ctx.gfx
@@ -191,7 +190,6 @@ impl Canvas3d {
         let pipeline3d = Canvas3d {
             depth,
             dirty_pipeline: false,
-            camera_bundle,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
@@ -248,6 +246,7 @@ impl Canvas3d {
                 },
             ),
             instance_buffer,
+            target: ctx.gfx.frame().clone(),
         };
 
         pipeline3d
@@ -255,7 +254,7 @@ impl Canvas3d {
 
     pub fn set_default_shader(&mut self, ctx: &mut Context) {
         let cube_code = include_str!("../resources/cube.wgsl");
-        let shader = graphics::ShaderBuilder::from_path(cube_code)
+        let shader = graphics::ShaderBuilder::from_code(cube_code)
             .build(&ctx.gfx)
             .unwrap(); // Should never fail since cube.wgsl is unchanging
         self.state.shader = shader;
@@ -328,7 +327,7 @@ impl Canvas3d {
                     label: Some("Render Pipeline"),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
-                        module: &self.state.shader.vs_module.as_ref().unwrap_or(
+                        module: self.state.shader.vs_module.as_ref().unwrap_or(
                             self.original_state
                                 .shader
                                 .vs_module
@@ -336,28 +335,7 @@ impl Canvas3d {
                                 .unwrap_or(self.original_state.shader.vs_module.as_ref().unwrap()), // Should always exist
                         ),
                         entry_point: "vs_main",
-                        buffers: &[
-                            wgpu::VertexBufferLayout {
-                                array_stride: std::mem::size_of::<Vertex>() as _,
-                                step_mode: wgpu::VertexStepMode::Vertex,
-                                attributes: &[
-                                    // pos
-                                    wgpu::VertexAttribute {
-                                        format: wgpu::VertexFormat::Float32x3,
-                                        offset: 0,
-                                        shader_location: 0,
-                                    },
-                                    // tex_coord
-                                    wgpu::VertexAttribute {
-                                        format: wgpu::VertexFormat::Float32x2,
-                                        offset: std::mem::size_of::<[f32; 3]>()
-                                            as wgpu::BufferAddress,
-                                        shader_location: 1,
-                                    },
-                                ],
-                            },
-                            Instance3d::desc(),
-                        ],
+                        buffers: &[Vertex::desc(), Instance3d::desc()],
                     },
                     primitive: wgpu::PrimitiveState {
                         topology: wgpu::PrimitiveTopology::TriangleList,
@@ -381,7 +359,7 @@ impl Canvas3d {
                         alpha_to_coverage_enabled: false,
                     },
                     fragment: Some(wgpu::FragmentState {
-                        module: &self
+                        module: self
                             .state
                             .shader
                             .fs_module
@@ -406,10 +384,12 @@ impl Canvas3d {
             self.update_pipeline(ctx);
         }
 
+        self.update_instance_data(ctx);
+
+        let draws: Vec<DrawCommand3d> = self.draws.drain(..).collect();
+
         {
-            let depth = self.depth.image(ctx).clone();
-            let frame = ctx.gfx.frame().clone();
-            self.update_instance_data(ctx);
+            let depth = self.depth.image(ctx);
             let mut pass =
                 ctx.gfx
                     .commands()
@@ -417,7 +397,7 @@ impl Canvas3d {
                     .begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: frame.wgpu().1,
+                            view: self.target.wgpu().1,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(
@@ -435,7 +415,7 @@ impl Canvas3d {
                             stencil_ops: None,
                         }),
                     });
-            for (i, draw) in self.draws.iter().enumerate() {
+            for (i, draw) in draws.iter().enumerate() {
                 let i = i as u32;
                 if draw.state.shader != self.state.shader {
                     // self.set_shader(draw.state.shader.clone());
@@ -474,6 +454,7 @@ impl Canvas3d {
                 );
                 pass.draw_indexed(0..draw.mesh.indices.len() as u32, 0, i..i + 1);
             }
+            std::mem::drop(pass);
         }
         self.draws.clear();
         Ok(())
@@ -494,7 +475,9 @@ impl Canvas3d {
         );
     }
 
-    pub fn draw(&mut self, mesh: Mesh3d, param: DrawParam3d) {
+    pub fn draw(&mut self, ctx: &mut Context, mesh: Mesh3d, param: DrawParam3d) {
+        let mut mesh = mesh;
+        mesh.gen_bind_group(&self.pipeline, ctx);
         self.draws.push(DrawCommand3d {
             mesh,
             state: self.state.clone(),
@@ -502,11 +485,15 @@ impl Canvas3d {
         });
     }
 
-    pub fn resize(&mut self, width: f32, height: f32, ctx: &mut Context) {
-        self.camera_bundle
-            .projection
-            .resize(width as u32, height as u32);
-        self.camera_uniform.update_view_proj(&self.camera_bundle);
+    pub fn resize(
+        &mut self,
+        width: f32,
+        height: f32,
+        ctx: &mut Context,
+        camera: &mut CameraBundle,
+    ) {
+        camera.projection.resize(width as u32, height as u32);
+        self.camera_uniform.update_view_proj(camera);
         ctx.gfx.wgpu().queue.write_buffer(
             &self.camera_buffer,
             0,
@@ -514,8 +501,8 @@ impl Canvas3d {
         );
     }
 
-    pub fn update_camera(&mut self, ctx: &mut Context) {
-        self.camera_uniform.update_view_proj(&self.camera_bundle);
+    pub fn update_camera(&mut self, ctx: &mut Context, camera: &mut CameraBundle) {
+        self.camera_uniform.update_view_proj(camera);
         ctx.gfx.wgpu().queue.write_buffer(
             &self.camera_buffer,
             0,
