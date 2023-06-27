@@ -469,7 +469,7 @@ impl Canvas3d {
         let instance_data = self
             .draws
             .iter()
-            .map(|x| Transform3dRaw::from_param(&x.param))
+            .map(|x| Transform3dRaw::from_param(&x.param, x.mesh.to_aabb().unwrap().center))
             .collect::<Vec<_>>();
         ctx.gfx.wgpu().queue.write_buffer(
             &self.instance_buffer,

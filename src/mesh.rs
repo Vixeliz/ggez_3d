@@ -1,11 +1,30 @@
-use crevice::std140::AsStd140;
 use ggez::graphics::Image;
 use ggez::{graphics, Context};
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat4, Vec3};
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 use crate::canvas::DrawParam3d;
+
+#[derive(Debug, Copy, Clone)]
+pub struct Aabb {
+    pub center: mint::Vector3<f32>,
+    pub half_extents: mint::Vector3<f32>,
+}
+
+impl Aabb {
+    #[inline]
+    pub fn from_min_max(minimum: Vec3, maximum: Vec3) -> Self {
+        let minimum = Vec3::from(minimum);
+        let maximum = Vec3::from(maximum);
+        let center = 0.5 * (maximum + minimum);
+        let half_extents = 0.5 * (maximum - minimum);
+        Self {
+            center: center.into(),
+            half_extents: half_extents.into(),
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 pub struct Transform3d {
@@ -32,7 +51,7 @@ pub struct Transform3dRaw {
 
 impl Default for Transform3dRaw {
     fn default() -> Self {
-        Self::from_param(&DrawParam3d::default())
+        Self::from_param(&DrawParam3d::default(), Vec3::ZERO)
     }
 }
 
@@ -68,13 +87,19 @@ impl Transform3dRaw {
             ],
         }
     }
-    pub fn from_param(param: &DrawParam3d) -> Self {
+    pub fn from_param<V>(param: &DrawParam3d, center: V) -> Self
+    where
+        V: Into<mint::Vector3<f32>>,
+    {
         // TODO: Use colors as well
-        let transform = Mat4::from_scale_rotation_translation(
-            param.transform.scale.into(),
-            param.transform.rotation.into(),
-            param.transform.position.into(),
-        );
+        let pivot: mint::Vector3<f32> = center.into();
+        let transform =
+            Mat4::from_translation(Vec3::from(param.transform.position) + Vec3::from(pivot))
+                * Mat4::from_scale(param.transform.scale.into())
+                * Mat4::from_quat(param.transform.rotation.into())
+                * Mat4::from_translation(
+                    (Vec3::from(param.transform.position) + Vec3::from(pivot)) * -1.0,
+                );
 
         Self {
             transform: [
@@ -166,5 +191,25 @@ impl Mesh3d {
         self.bind_group = Some(Arc::new(bind_group));
         self.vert_buffer = Some(Arc::new(verts));
         self.ind_buffer = Some(Arc::new(inds));
+    }
+
+    pub fn to_aabb(&self) -> Option<Aabb> {
+        let mut minimum = Vec3::MAX;
+        let mut maximum = Vec3::MIN;
+        for p in self.vertices.iter() {
+            minimum = minimum.min(Vec3::from_array(p.pos));
+            maximum = maximum.max(Vec3::from_array(p.pos));
+        }
+        if minimum.x != std::f32::MAX
+            && minimum.y != std::f32::MAX
+            && minimum.z != std::f32::MAX
+            && maximum.x != std::f32::MIN
+            && maximum.y != std::f32::MIN
+            && maximum.z != std::f32::MIN
+        {
+            return Some(Aabb::from_min_max(minimum, maximum));
+        } else {
+            None
+        }
     }
 }

@@ -152,6 +152,12 @@ impl event::EventHandler<ggez::GameError> for MainState {
         let forward = Vec3::new(yaw_cos, 0.0, yaw_sin).normalize();
         let right = Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
 
+        if k_ctx.is_key_pressed(KeyCode::Q) {
+            self.meshes[1].1 += 0.1;
+        }
+        if k_ctx.is_key_pressed(KeyCode::E) {
+            self.meshes[1].1 -= 0.1;
+        }
         if k_ctx.is_key_just_pressed(KeyCode::K) {
             if self.default_shader {
                 self.canvas3d.set_shader(self.custom_shader.clone());
