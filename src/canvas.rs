@@ -274,7 +274,7 @@ impl Canvas3d {
 
     pub fn set_shader(&mut self, shader: Shader) {
         self.state.shader = shader;
-        self.dirty_pipeline;
+        self.dirty_pipeline = true;
     }
 
     pub fn update_pipeline(&mut self, ctx: &mut Context) {
@@ -448,6 +448,7 @@ impl Canvas3d {
                 let i = i as u32;
                 if draw.state.shader != self.state.shader {
                     // self.set_shader(draw.state.shader.clone());
+                    // self.update_pipeline(ctx);
                 }
 
                 pass.set_pipeline(&self.pipeline);
