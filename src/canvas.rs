@@ -1,10 +1,10 @@
-use ggez::glam::*;
 use ggez::graphics::{Color, Shader};
+use ggez::{glam::*, GameError, GameResult};
 use ggez::{graphics, Context};
 use wgpu::util::DeviceExt;
 
 use crate::camera::CameraBundle;
-use crate::mesh::{Instance3d, Transform3d, Vertex};
+use crate::mesh::{Aabb, Instance3d, Transform3d, Vertex};
 use crate::{camera::CameraUniform, prelude::*};
 
 #[derive(Clone)]
@@ -90,15 +90,15 @@ pub struct Canvas3d {
 
 impl Canvas3d {
     pub fn new(ctx: &mut Context) -> Self {
-        let shader = graphics::ShaderBuilder::from_path("/cube.wgsl")
+        let cube_code = include_str!("../resources/cube.wgsl");
+        let shader = graphics::ShaderBuilder::from_code(cube_code)
             .build(&ctx.gfx)
-            .unwrap();
+            .unwrap(); // Should never fail since cube.wgsl is unchanging
 
         let mut camera_bundle = CameraBundle::default();
         camera_bundle.projection.aspect = ctx.gfx.size().0 / ctx.gfx.size().1;
         let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&camera_bundle);
-        // let draw_uniform = Draw3dUniforms::default();
 
         let camera_buffer =
             ctx.gfx
@@ -207,7 +207,7 @@ impl Canvas3d {
                     label: Some("Render Pipeline"),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
-                        module: &shader.vs_module.unwrap(),
+                        module: &shader.vs_module.unwrap(), // Should never fail since it's already built
                         entry_point: "vs_main",
                         buffers: &[Vertex::desc(), Instance3d::desc()],
                     },
@@ -233,7 +233,7 @@ impl Canvas3d {
                         alpha_to_coverage_enabled: false,
                     },
                     fragment: Some(wgpu::FragmentState {
-                        module: &shader.fs_module.unwrap(),
+                        module: &shader.fs_module.unwrap(), // Should never fail since already built
                         entry_point: "fs_main",
                         targets: &[Some(wgpu::ColorTargetState {
                             format: ctx.gfx.surface_format(),
@@ -254,9 +254,10 @@ impl Canvas3d {
     }
 
     pub fn set_default_shader(&mut self, ctx: &mut Context) {
-        let shader = graphics::ShaderBuilder::from_path("/cube.wgsl")
+        let cube_code = include_str!("../resources/cube.wgsl");
+        let shader = graphics::ShaderBuilder::from_path(cube_code)
             .build(&ctx.gfx)
-            .unwrap();
+            .unwrap(); // Should never fail since cube.wgsl is unchanging
         self.state.shader = shader;
         self.dirty_pipeline = true;
     }
@@ -327,12 +328,13 @@ impl Canvas3d {
                     label: Some("Render Pipeline"),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
-                        module: &self
-                            .state
-                            .shader
-                            .vs_module
-                            .as_ref()
-                            .unwrap_or(self.original_state.shader.vs_module.as_ref().unwrap()),
+                        module: &self.state.shader.vs_module.as_ref().unwrap_or(
+                            self.original_state
+                                .shader
+                                .vs_module
+                                .as_ref()
+                                .unwrap_or(self.original_state.shader.vs_module.as_ref().unwrap()), // Should always exist
+                        ),
                         entry_point: "vs_main",
                         buffers: &[
                             wgpu::VertexBufferLayout {
@@ -384,7 +386,7 @@ impl Canvas3d {
                             .shader
                             .fs_module
                             .as_ref()
-                            .unwrap_or(self.original_state.shader.fs_module.as_ref().unwrap()),
+                            .unwrap_or(self.original_state.shader.fs_module.as_ref().unwrap()), // Should always exist since we use original
                         entry_point: "fs_main",
                         targets: &[Some(wgpu::ColorTargetState {
                             format: ctx.gfx.surface_format(),
@@ -399,7 +401,7 @@ impl Canvas3d {
                 });
     }
 
-    pub fn finish(&mut self, ctx: &mut Context, clear_color: Color) {
+    pub fn finish(&mut self, ctx: &mut Context, clear_color: Color) -> GameResult {
         if self.dirty_pipeline {
             self.update_pipeline(ctx);
         }
@@ -442,24 +444,48 @@ impl Canvas3d {
 
                 pass.set_pipeline(&self.pipeline);
                 pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-                pass.set_bind_group(0, draw.mesh.bind_group.as_ref().unwrap(), &[]);
+                pass.set_bind_group(
+                    0,
+                    draw.mesh.bind_group.as_ref().ok_or(GameError::CustomError(
+                        "Bind Group not generated for mesh".to_string(),
+                    ))?,
+                    &[],
+                );
                 pass.set_bind_group(1, &self.camera_bind_group, &[]);
-                pass.set_vertex_buffer(0, draw.mesh.vert_buffer.as_ref().unwrap().slice(..));
+                pass.set_vertex_buffer(
+                    0,
+                    draw.mesh
+                        .vert_buffer
+                        .as_ref()
+                        .ok_or(GameError::CustomError(
+                            "Vert Buffer not generated for mesh".to_string(),
+                        ))?
+                        .slice(..),
+                );
                 pass.set_index_buffer(
-                    draw.mesh.ind_buffer.as_ref().unwrap().slice(..),
+                    draw.mesh
+                        .ind_buffer
+                        .as_ref()
+                        .ok_or(GameError::CustomError(
+                            "Ind Buffer not generated for mesh".to_string(),
+                        ))?
+                        .slice(..),
                     wgpu::IndexFormat::Uint32,
                 );
                 pass.draw_indexed(0..draw.mesh.indices.len() as u32, 0, i..i + 1);
             }
         }
         self.draws.clear();
+        Ok(())
     }
 
     pub fn update_instance_data(&mut self, ctx: &mut Context) {
         let instance_data = self
             .draws
             .iter()
-            .map(|x| Instance3d::from_param(&x.param, x.mesh.to_aabb().unwrap().center))
+            .map(|x| {
+                Instance3d::from_param(&x.param, x.mesh.to_aabb().unwrap_or(Aabb::default()).center)
+            })
             .collect::<Vec<_>>();
         ctx.gfx.wgpu().queue.write_buffer(
             &self.instance_buffer,

@@ -96,12 +96,6 @@ impl MainState {
             20, 21, 22, 22, 23, 20, // back
         ];
 
-        let image = graphics::Image::from_color(
-            ctx,
-            1,
-            1,
-            Some(graphics::Color::from_rgb(0x20, 0xA0, 0xC0)),
-        );
         let image_two =
             graphics::Image::from_color(ctx, 1, 1, Some(graphics::Color::from_rgb(50, 10, 50)));
         let mut mesh = Mesh3d {
@@ -110,7 +104,7 @@ impl MainState {
             vert_buffer: None,
             ind_buffer: None,
             bind_group: None,
-            texture: Some(image),
+            texture: None,
         };
 
         mesh.gen_wgpu_buffer(&canvas3d.pipeline, ctx);
@@ -206,10 +200,10 @@ impl event::EventHandler<ggez::GameError> for MainState {
                 mesh.0.clone(),
                 DrawParam3d::default()
                     .scale(mesh.1)
-                    .color(Color::new(0.5, 0.0, 0.0, 0.1)),
+                    .color(Color::new(0.5, 0.0, 0.0, 0.5)),
             );
         }
-        self.canvas3d.finish(ctx, Color::BLACK);
+        self.canvas3d.finish(ctx, Color::BLACK)?;
         let mut canvas = graphics::Canvas::from_frame(ctx, None);
 
         // Do ggez drawing

@@ -13,6 +13,15 @@ pub struct Aabb {
     pub half_extents: mint::Vector3<f32>,
 }
 
+impl Default for Aabb {
+    fn default() -> Self {
+        Self {
+            center: Vec3::ZERO.into(),
+            half_extents: Vec3::ZERO.into(),
+        }
+    }
+}
+
 impl Aabb {
     #[inline]
     pub fn from_min_max(minimum: Vec3, maximum: Vec3) -> Self {
@@ -225,7 +234,16 @@ impl Mesh3d {
                     wgpu::BindGroupEntry {
                         binding: 0,
                         resource: wgpu::BindingResource::TextureView(
-                            self.texture.as_ref().unwrap().wgpu().1,
+                            self.texture
+                                .as_ref()
+                                .unwrap_or(&Image::from_color(
+                                    ctx,
+                                    1,
+                                    1,
+                                    Some(graphics::Color::WHITE),
+                                ))
+                                .wgpu()
+                                .1,
                         ),
                     },
                     wgpu::BindGroupEntry {
