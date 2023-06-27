@@ -22,68 +22,68 @@ impl MainState {
     fn new(ctx: &mut Context) -> GameResult<Self> {
         let mut canvas3d = Canvas3d::new(ctx);
         let vertex_data = vec![
-            // top (0, 0, 1)
-            Vertex::new([-1, -1, 1], [0, 0]),
-            Vertex::new([1, -1, 1], [1, 0]),
-            Vertex::new([1, 1, 1], [1, 1]),
-            Vertex::new([-1, 1, 1], [0, 1]),
-            // bottom (0, 0, -1)
-            Vertex::new([-1, 1, -1], [1, 0]),
-            Vertex::new([1, 1, -1], [0, 0]),
-            Vertex::new([1, -1, -1], [0, 1]),
-            Vertex::new([-1, -1, -1], [1, 1]),
-            // right (1, 0, 0)
-            Vertex::new([1, -1, -1], [0, 0]),
-            Vertex::new([1, 1, -1], [1, 0]),
-            Vertex::new([1, 1, 1], [1, 1]),
-            Vertex::new([1, -1, 1], [0, 1]),
-            // left (-1, 0, 0)
-            Vertex::new([-1, -1, 1], [1, 0]),
-            Vertex::new([-1, 1, 1], [0, 0]),
-            Vertex::new([-1, 1, -1], [0, 1]),
-            Vertex::new([-1, -1, -1], [1, 1]),
-            // front (0, 1, 0)
-            Vertex::new([1, 1, -1], [1, 0]),
-            Vertex::new([-1, 1, -1], [0, 0]),
-            Vertex::new([-1, 1, 1], [0, 1]),
-            Vertex::new([1, 1, 1], [1, 1]),
-            // back (0, -1, 0)
-            Vertex::new([1, -1, 1], [0, 0]),
-            Vertex::new([-1, -1, 1], [1, 0]),
-            Vertex::new([-1, -1, -1], [1, 1]),
-            Vertex::new([1, -1, -1], [0, 1]),
+            // top (0.0, 0.0, 1.0)
+            Vertex::new([-1.0, -1.0, 1.0], [0.0, 0.0], Color::GREEN),
+            Vertex::new([1.0, -1.0, 1.0], [1.0, 0.0], Color::GREEN),
+            Vertex::new([1.0, 1.0, 1.0], [1.0, 1.0], Color::GREEN),
+            Vertex::new([-1.0, 1.0, 1.0], [0.0, 1.0], Color::new(0.0, 0.1, 0.0, 1.0)),
+            // bottom (0.0, 0.0, -1.0)
+            Vertex::new([-1.0, 1.0, -1.0], [1.0, 0.0], None),
+            Vertex::new([1.0, 1.0, -1.0], [0.0, 0.0], None),
+            Vertex::new([1.0, -1.0, -1.0], [0.0, 1.0], None),
+            Vertex::new([-1.0, -1.0, -1.0], [1.0, 1.0], None),
+            // right (1.0, 0.0, 0.0)
+            Vertex::new([1.0, -1.0, -1.0], [0.0, 0.0], None),
+            Vertex::new([1.0, 1.0, -1.0], [1.0, 0.0], None),
+            Vertex::new([1.0, 1.0, 1.0], [1.0, 1.0], None),
+            Vertex::new([1.0, -1.0, 1.0], [0.0, 1.0], None),
+            // left (-1.0, 0.0, 0.0)
+            Vertex::new([-1.0, -1.0, 1.0], [1.0, 0.0], None),
+            Vertex::new([-1.0, 1.0, 1.0], [0.0, 0.0], None),
+            Vertex::new([-1.0, 1.0, -1.0], [0.0, 1.0], None),
+            Vertex::new([-1.0, -1.0, -1.0], [1.0, 1.0], None),
+            // front (0.0, 1.0, 0.0)
+            Vertex::new([1.0, 1.0, -1.0], [1.0, 0.0], None),
+            Vertex::new([-1.0, 1.0, -1.0], [0.0, 0.0], None),
+            Vertex::new([-1.0, 1.0, 1.0], [0.0, 1.0], None),
+            Vertex::new([1.0, 1.0, 1.0], [1.0, 1.0], None),
+            // back (0.0, -1.0, 0.0)
+            Vertex::new([1.0, -1.0, 1.0], [0.0, 0.0], None),
+            Vertex::new([-1.0, -1.0, 1.0], [1.0, 0.0], None),
+            Vertex::new([-1.0, -1.0, -1.0], [1.0, 1.0], None),
+            Vertex::new([1.0, -1.0, -1.0], [0.0, 1.0], None),
         ];
         let vertex_data_two = vec![
-            // top (0, 0, 1)
-            Vertex::new([2, 2, 2], [0, 0]),
-            Vertex::new([4, 2, 2], [1, 0]),
-            Vertex::new([4, 4, 2], [1, 1]),
-            Vertex::new([2, 4, 2], [0, 1]),
-            // bottom (0, 0, -1)
-            Vertex::new([2, 4, -1], [1, 0]),
-            Vertex::new([4, 4, -1], [0, 0]),
-            Vertex::new([4, 2, -1], [0, 1]),
-            Vertex::new([2, 2, -1], [1, 1]),
-            // right (1, 0, 0)
-            Vertex::new([4, 2, -1], [0, 0]),
-            Vertex::new([4, 4, -1], [1, 0]),
-            Vertex::new([4, 4, 2], [1, 1]),
-            Vertex::new([4, 2, 2], [0, 1]),
-            // left (-1, 0, 0)
-            Vertex::new([2, 2, 2], [1, 0]),
-            Vertex::new([2, 4, 2], [0, 0]),
-            Vertex::new([2, 4, -1], [0, 1]),
-            Vertex::new([2, 2, -1], [1, 1]),
-            // front (0, 1, 0)
-            Vertex::new([4, 4, -1], [1, 0]),
-            Vertex::new([2, 4, -1], [0, 0]),
-            Vertex::new([2, 4, 2], [0, 1]),
-            Vertex::new([4, 4, 2], [1, 1]),
-            // back (0, -1, 0)
-            Vertex::new([4, 2, 2], [0, 0]),
-            Vertex::new([2, 2, 2], [1, 0]),
-            Vertex::new([2, 2, -1], [1, 1]),
-            Vertex::new([4, 2, -1], [0, 1]),
+            // top (0.0, 0.0, 1.0)
+            Vertex::new([2.0, 2.0, 2.0], [0.0, 0.0], None),
+            Vertex::new([4.0, 2.0, 2.0], [1.0, 0.0], None),
+            Vertex::new([4.0, 4.0, 2.0], [1.0, 1.0], None),
+            Vertex::new([2.0, 4.0, 2.0], [0.0, 1.0], None),
+            // bottom (0.0, 0.0, -1.0)
+            Vertex::new([2.0, 4.0, -1.0], [1.0, 0.0], None),
+            Vertex::new([4.0, 4.0, -1.0], [0.0, 0.0], None),
+            Vertex::new([4.0, 2.0, -1.0], [0.0, 1.0], None),
+            Vertex::new([2.0, 2.0, -1.0], [1.0, 1.0], None),
+            // right (1.0, 0.0, 0.0)
+            Vertex::new([4.0, 2.0, -1.0], [0.0, 0.0], None),
+            Vertex::new([4.0, 4.0, -1.0], [1.0, 0.0], None),
+            Vertex::new([4.0, 4.0, 2.0], [1.0, 1.0], None),
+            Vertex::new([4.0, 2.0, 2.0], [0.0, 1.0], None),
+            // left (-1.0, 0.0, 0.0)
+            Vertex::new([2.0, 2.0, 2.0], [1.0, 0.0], None),
+            Vertex::new([2.0, 4.0, 2.0], [0.0, 0.0], None),
+            Vertex::new([2.0, 4.0, -1.0], [0.0, 1.0], None),
+            Vertex::new([2.0, 2.0, -1.0], [1.0, 1.0], None),
+            // front (0.0, 1.0, 0.0)
+            Vertex::new([4.0, 4.0, -1.0], [1.0, 0.0], None),
+            Vertex::new([2.0, 4.0, -1.0], [0.0, 0.0], None),
+            Vertex::new([2.0, 4.0, 2.0], [0.0, 1.0], None),
+            Vertex::new([4.0, 4.0, 2.0], [1.0, 1.0], None),
+            // back (0.0, -1.0, 0.0)
+            Vertex::new([4.0, 2.0, 2.0], [0.0, 0.0], None),
+            Vertex::new([2.0, 2.0, 2.0], [1.0, 0.0], None),
+            Vertex::new([2.0, 2.0, -1.0], [1.0, 1.0], None),
+            Vertex::new([4.0, 2.0, -1.0], [0.0, 1.0], None),
         ];
 
         #[rustfmt::skip]
@@ -202,8 +202,12 @@ impl event::EventHandler<ggez::GameError> for MainState {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         for mesh in self.meshes.iter() {
-            self.canvas3d
-                .draw(mesh.0.clone(), DrawParam3d::default().scale(mesh.1));
+            self.canvas3d.draw(
+                mesh.0.clone(),
+                DrawParam3d::default()
+                    .scale(mesh.1)
+                    .color(Color::new(0.5, 0.0, 0.0, 0.1)),
+            );
         }
         self.canvas3d.finish(ctx, Color::BLACK);
         let mut canvas = graphics::Canvas::from_frame(ctx, None);

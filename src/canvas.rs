@@ -4,12 +4,14 @@ use ggez::{graphics, Context};
 use wgpu::util::DeviceExt;
 
 use crate::camera::CameraBundle;
-use crate::mesh::{Transform3d, Transform3dRaw, Vertex};
+use crate::mesh::{Instance3d, Transform3d, Vertex};
 use crate::{camera::CameraUniform, prelude::*};
 
 #[derive(Clone)]
 pub struct DrawParam3d {
     pub transform: Transform3d,
+    /// The alpha component is used for intensity of blending instead of actual alpha
+    pub color: Color,
 }
 
 impl DrawParam3d {
@@ -39,12 +41,23 @@ impl DrawParam3d {
         self.transform.rotation = p;
         self
     }
+
+    pub fn color(mut self, color: Color) -> Self {
+        self.color = color;
+        self
+    }
+
+    pub fn transform(mut self, transform: Transform3d) -> Self {
+        self.transform = transform;
+        self
+    }
 }
 
 impl Default for DrawParam3d {
     fn default() -> Self {
         Self {
             transform: Transform3d::default(),
+            color: Color::new(1.0, 1.0, 1.0, 0.0),
         }
     }
 }
@@ -103,10 +116,7 @@ impl Canvas3d {
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Instance Buffer"),
-                    contents: bytemuck::cast_slice(&[
-                        Transform3dRaw::default(),
-                        Transform3dRaw::default(),
-                    ]),
+                    contents: bytemuck::cast_slice(&[Instance3d::default(), Instance3d::default()]),
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 });
 
@@ -199,28 +209,7 @@ impl Canvas3d {
                     vertex: wgpu::VertexState {
                         module: &shader.vs_module.unwrap(),
                         entry_point: "vs_main",
-                        buffers: &[
-                            wgpu::VertexBufferLayout {
-                                array_stride: std::mem::size_of::<Vertex>() as _,
-                                step_mode: wgpu::VertexStepMode::Vertex,
-                                attributes: &[
-                                    // pos
-                                    wgpu::VertexAttribute {
-                                        format: wgpu::VertexFormat::Float32x3,
-                                        offset: 0,
-                                        shader_location: 0,
-                                    },
-                                    // tex_coord
-                                    wgpu::VertexAttribute {
-                                        format: wgpu::VertexFormat::Float32x2,
-                                        offset: std::mem::size_of::<[f32; 3]>()
-                                            as wgpu::BufferAddress,
-                                        shader_location: 1,
-                                    },
-                                ],
-                            },
-                            Transform3dRaw::desc(),
-                        ],
+                        buffers: &[Vertex::desc(), Instance3d::desc()],
                     },
                     primitive: wgpu::PrimitiveState {
                         topology: wgpu::PrimitiveTopology::TriangleList,
@@ -365,7 +354,7 @@ impl Canvas3d {
                                     },
                                 ],
                             },
-                            Transform3dRaw::desc(),
+                            Instance3d::desc(),
                         ],
                     },
                     primitive: wgpu::PrimitiveState {
@@ -470,7 +459,7 @@ impl Canvas3d {
         let instance_data = self
             .draws
             .iter()
-            .map(|x| Transform3dRaw::from_param(&x.param, x.mesh.to_aabb().unwrap().center))
+            .map(|x| Instance3d::from_param(&x.param, x.mesh.to_aabb().unwrap().center))
             .collect::<Vec<_>>();
         ctx.gfx.wgpu().queue.write_buffer(
             &self.instance_buffer,

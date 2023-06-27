@@ -1,6 +1,7 @@
 use ggez::graphics::Image;
 use ggez::{graphics, Context};
 use glam::{Mat4, Vec3};
+use mint::{Vector2, Vector3};
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
@@ -45,21 +46,22 @@ impl Default for Transform3d {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Transform3dRaw {
+pub struct Instance3d {
     transform: [[f32; 4]; 4],
+    color: [f32; 4],
 }
 
-impl Default for Transform3dRaw {
+impl Default for Instance3d {
     fn default() -> Self {
         Self::from_param(&DrawParam3d::default(), Vec3::ZERO)
     }
 }
 
-impl Transform3dRaw {
+impl Instance3d {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         use std::mem;
         wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Transform3dRaw>() as wgpu::BufferAddress,
+            array_stride: mem::size_of::<Instance3d>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &[
                 wgpu::VertexAttribute {
@@ -84,6 +86,11 @@ impl Transform3dRaw {
                     shader_location: 8,
                     format: wgpu::VertexFormat::Float32x4,
                 },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
+                    shader_location: 9,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
             ],
         }
     }
@@ -91,7 +98,6 @@ impl Transform3dRaw {
     where
         V: Into<mint::Vector3<f32>>,
     {
-        // TODO: Use colors as well
         let pivot: mint::Vector3<f32> = center.into();
         let transform =
             Mat4::from_translation(Vec3::from(param.transform.position) + Vec3::from(pivot))
@@ -108,6 +114,7 @@ impl Transform3dRaw {
                 transform.z_axis.into(),
                 transform.w_axis.into(),
             ],
+            color: param.color.into(),
         }
     }
 }
@@ -118,13 +125,53 @@ impl Transform3dRaw {
 pub struct Vertex {
     pub pos: [f32; 3],
     pub tex_coord: [f32; 2],
+    pub color: [f32; 4],
 }
 
 impl Vertex {
-    pub fn new(p: [i8; 3], t: [i8; 2]) -> Vertex {
+    pub fn new<V, T, C>(position: V, uv: T, color: C) -> Vertex
+    where
+        V: Into<Vector3<f32>>,
+        T: Into<Vector2<f32>>,
+        C: Into<Option<graphics::Color>>,
+    {
+        let position: Vector3<f32> = position.into();
+        let uv: Vector2<f32> = uv.into();
+        let color: Option<graphics::Color> = color.into();
+        let color = color
+            .unwrap_or(graphics::Color::new(1.0, 1.0, 1.0, 0.0))
+            .into();
         Vertex {
-            pos: [f32::from(p[0]), f32::from(p[1]), f32::from(p[2])],
-            tex_coord: [f32::from(t[0]), f32::from(t[1])],
+            pos: position.into(),
+            tex_coord: uv.into(),
+            color,
+        }
+    }
+
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex>() as _,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                // pos
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: 0,
+                    shader_location: 0,
+                },
+                // tex_coord
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x2,
+                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                },
+                //color
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: std::mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
+                    shader_location: 2,
+                },
+            ],
         }
     }
 }

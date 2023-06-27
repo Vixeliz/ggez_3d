@@ -5,6 +5,7 @@ struct CameraUniform {
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) tex_coords: vec2<f32>,
+    @location(2) color: vec4<f32>,
 }
 
 struct InstanceInput {
@@ -12,13 +13,16 @@ struct InstanceInput {
     @location(6) model_matrix_1: vec4<f32>,
     @location(7) model_matrix_2: vec4<f32>,
     @location(8) model_matrix_3: vec4<f32>,
+    @location(9) color: vec4<f32>,
 }
 
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coord: vec2<f32>,
-};
+    @location(1) color: vec4<f32>,
+    @location(2) vertex_color: vec4<f32>
+}
 
 
 @group(1) @binding(0)
@@ -39,6 +43,8 @@ fn vs_main(
     var out: VertexOutput;
     out.tex_coord = model.tex_coords;
     out.clip_position = camera.view_proj * model_matrix * vec4<f32>(model.position, 1.0);
+    out.color = instance.color;
+    out.vertex_color = model.color;
     return out;
 }
 
@@ -50,5 +56,6 @@ var s_sampler: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(t_color, s_sampler, in.tex_coord);
+    var tex = textureSample(t_color, s_sampler, in.tex_coord);
+    return mix(mix(tex, vec4<f32>(in.color.xyz, 1.0), in.color.w), vec4<f32>(in.vertex_color.xyz, 1.0), in.vertex_color.w);
 }
