@@ -217,7 +217,7 @@ impl Canvas3d {
                     label: Some("Render Pipeline"),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
-                        module: &shader.vs_module.unwrap(), // Should never fail since it's already built
+                        module: &shader.vs_module().unwrap(), // Should never fail since it's already built
                         entry_point: "vs_main",
                         buffers: &[Vertex::desc(), Instance3d::desc()],
                     },
@@ -243,7 +243,7 @@ impl Canvas3d {
                         alpha_to_coverage_enabled: false,
                     },
                     fragment: Some(wgpu::FragmentState {
-                        module: &shader.fs_module.unwrap(), // Should never fail since already built
+                        module: &shader.fs_module().unwrap(), // Should never fail since already built
                         entry_point: "fs_main",
                         targets: &[Some(wgpu::ColorTargetState {
                             format: ctx.gfx.surface_format(),
@@ -339,12 +339,10 @@ impl Canvas3d {
                     label: Some("Render Pipeline"),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
-                        module: self.state.shader.vs_module.as_ref().unwrap_or(
-                            self.original_state
-                                .shader
-                                .vs_module
-                                .as_ref()
-                                .unwrap_or(self.original_state.shader.vs_module.as_ref().unwrap()), // Should always exist
+                        module: self.state.shader.vs_module().as_ref().unwrap_or(
+                            self.original_state.shader.vs_module().as_ref().unwrap_or(
+                                self.original_state.shader.vs_module().as_ref().unwrap(),
+                            ), // Should always exist
                         ),
                         entry_point: "vs_main",
                         buffers: &[Vertex::desc(), Instance3d::desc()],
@@ -374,9 +372,9 @@ impl Canvas3d {
                         module: self
                             .state
                             .shader
-                            .fs_module
+                            .fs_module()
                             .as_ref()
-                            .unwrap_or(self.original_state.shader.fs_module.as_ref().unwrap()), // Should always exist since we use original
+                            .unwrap_or(self.original_state.shader.fs_module().as_ref().unwrap()), // Should always exist since we use original
                         entry_point: "fs_main",
                         targets: &[Some(wgpu::ColorTargetState {
                             format: ctx.gfx.surface_format(),
